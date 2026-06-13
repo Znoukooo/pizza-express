@@ -7,14 +7,13 @@
       "start": "echo 'Jalankan index.html menggunakan VS Code Live Server.'"
     },
     "dependencies": {
-      "@supabase/supabase-js": "^2.43.0",
-      "xendit-node": "^2.3.0"
+      "@supabase/supabase-js": "^2.43.0"
     },
     "keywords": [
       "pizza",
       "supabase",
-      "netlify",
-      "xendit"
+      "netlify"
+      
     ],
     "author": "Znoukooo",
     "license": "ISC"
