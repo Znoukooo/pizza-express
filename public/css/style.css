@@ -1,0 +1,15 @@
+/* Custom utility tambahan */
+.hero-bg {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border-left: 5px solid #dc3545;
+}
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dynamic-view {
+    animation: fadeIn 0.4s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

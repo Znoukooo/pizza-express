@@ -1,0 +1,21 @@
+{
+    "name": "pizza-express-supabase",
+    "version": "1.0.0",
+    "description": "Aplikasi Pizza Express dengan Supabase, QRIS Xendit, dan Netlify",
+    "main": "public/index.html",
+    "scripts": {
+      "start": "echo 'Jalankan index.html menggunakan VS Code Live Server.'"
+    },
+    "dependencies": {
+      "@supabase/supabase-js": "^2.43.0",
+      "xendit-node": "^2.3.0"
+    },
+    "keywords": [
+      "pizza",
+      "supabase",
+      "netlify",
+      "xendit"
+    ],
+    "author": "Znoukooo",
+    "license": "ISC"
+  }

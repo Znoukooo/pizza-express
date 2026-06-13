@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Internal Staff</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+  
+  <style>
+    @media print {
+      /* Sembunyikan seluruh elemen dashboard web */
+      body * {
+        visibility: hidden;
+      }
+      /* Hanya tampilkan area struk content saja */
+      #modalStruk, #modalStruk * {
+        visibility: visible;
+      }
+      #modalStruk {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      /* Paksa modal content mengambil seluruh lebar kertas printer thermal */
+      .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .modal-body {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      /* Hilangkan tombol close, footer, dan header modal saat diprint */
+      .btn-close, .modal-footer, .modal-header {
+        display: none !important;
+      }
+      /* Set ukuran page otomatis menyesuaikan isi struk */
+      @page {
+        size: auto;
+        margin: 0mm;
+      }
+    }
+    
+    /* Ukuran thumbnail gambar menu di admin panel */
+    .admin-thumb {
+      width: 50px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+      <span class="navbar-brand fw-bold text-warning">🍕 Pizza Express - Staff Room</span>
+      <div class="d-flex align-items-center">
+        <span class="text-white me-3 bg-secondary px-3 py-1 rounded-pill small" id="user-display">Loading...</span>
+        <button onclick="logout()" class="btn btn-sm btn-outline-danger rounded-pill px-3">Keluar</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5">
+    <h2 class="fw-bold mb-4">Ruang Kendali: <span class="text-danger" id="role-title">Role</span></h2>
+
+    <div id="view-admin" class="d-none dynamic-view">
+        <div class="row">
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-danger text-white fw-bold py-3">Tambah Menu Baru</div>
+                    <div class="card-body p-4">
+                        <form id="add-menu-form">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Nama Menu</label>
+                                <input type="text" id="admin-pizza-name" class="form-control" required placeholder="Contoh: Ice Sweet Tea">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Harga (Rp)</label>
+                                <input type="number" id="admin-pizza-price" class="form-control" required placeholder="Contoh: 10000">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Kategori Menu</label>
+                                <select id="admin-pizza-category" class="form-select">
+                                    <option value="Classic">Classic Pizza</option>
+                                    <option value="Signature">Signature Pizza</option>
+                                    <option value="Premium">Premium Pizza</option>
+                                    <option value="Minuman">Minuman (Drinks)</option>
+                                    <option value="Snack">Makanan Ringan (Snack)</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold">Foto Produk / Menu</label>
+                                <input type="file" id="admin-pizza-image" class="form-control" accept="image/*" required>
+                                <div class="form-text text-muted" style="font-size: 11px;">File gambar otomatis ter-upload ke Cloud Storage Supabase.</div>
+                            </div>
+                            <button type="submit" id="btn-submit-menu" class="btn btn-danger w-100 fw-bold py-2">Simpan & Unggah Menu</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div id="admin-categories-container">
+                    <div class="card shadow-sm border-0 rounded-3 mb-4">
+                        <div class="card-header bg-dark text-white fw-bold py-3">Daftar Menu Saat Ini</div>
+                        <div class="card-body text-center py-4 text-muted small">
+                            ⏳ Memuat data menu restoran...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-kasir" class="d-none dynamic-view">
+        <button class="btn btn-primary mb-4 px-4 fw-bold rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#modalInputManual">
+          + Pesanan Manual Kasir
+        </button>
+
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-header bg-warning text-dark fw-bold py-3">⏳ Antrian Transaksi Toko (Sedang Berjalan)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr><th>No Antrian</th><th>Pelanggan</th><th>Tipe</th><th>Total</th><th>Pembayaran</th><th>Status Order</th><th>Aksi</th></tr>
+                        </thead>
+                        <tbody id="kasir-orders-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success text-white fw-bold py-3">✅ Riwayat Transaksi Selesai (Arsip)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>No Antrian</th><th>Pelanggan</th><th>Tipe</th><th>Total</th><th>Pembayaran</th><th>Status Order</th><th>Aksi Struk</th></tr>
+                        </thead>
+                        <tbody id="kasir-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-dapur" class="d-none dynamic-view">
+        <div class="card shadow-sm border-0 mb-4 bg-light">
+            <div class="card-header bg-dark text-warning fw-bold py-3 d-flex justify-content-between align-items-center">
+                <span>👨‍🍳 Papan Antrean Dapur (FIFO)</span>
+                <span class="badge bg-danger" id="dapur-queue-count">0 Pesanan</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="row" id="dapur-orders-container">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-kurir" class="d-none dynamic-view">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-info text-white fw-bold py-3">Daftar Pengantaran (Delivery)</div>
+            <div class="card-body p-4">
+                <div class="list-group" id="kurir-orders-container"></div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalInputManual" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold">Tambah Pesanan Baru</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="row">
+            <div class="col-md-6 border-end" style="max-height: 420px; overflow-y: auto;">
+              <label class="form-label fw-bold">Pilih Menu:</label>
+              <div id="manual-menu-list" class="list-group"></div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Keranjang Belanja:</label>
+                <div id="cart-items" class="mb-3 small" style="max-height: 180px; overflow-y: auto;"></div>
+                <hr>
+                <h5 class="fw-bold mb-3">Total: <span id="cart-total" class="text-danger">Rp 0</span></h5>
+                
+                <input type="text" id="manual-name" class="form-control mb-2" placeholder="Nama Pelanggan" required>
+                
+                <div class="mb-2">
+                  <label class="form-label small fw-bold text-muted">Tipe Layanan</label>
+                  <select id="manual-type" class="form-select">
+                    <option value="dine in">Dine In</option>
+                    <option value="takeaway">Takeaway</option>
+                  </select>
+                </div>
+  
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Metode Pembayaran</label>
+                  <select id="manual-payment" class="form-select">
+                    <option value="tunai">💵 Tunai (Cash)</option>
+                    <option value="qris">📱 QRIS Gopay</option>
+                  </select>
+                </div>
+  
+                <button onclick="prosesPesananCart()" class="btn btn-danger w-100 fw-bold py-2 shadow-sm">Buat Pesanan & Proses</button>
+              </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalQrisGopay" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg text-center">
+        <div class="modal-header bg-primary text-white py-2 justify-content-center">
+          <h6 class="modal-title fw-bold mb-0">📱 SCAN QRIS GOPAY MERCHANT</h6>
+        </div>
+        <div class="modal-body p-3">
+          <p class="small text-muted mb-2">Silakan scan dan bayar tepat sebesar:</p>
+          <h4 class="fw-bold text-danger mb-3" id="qris-price-display">Rp 0</h4>
+          
+          <img src="css/qris.jpeg" alt="QRIS Gopay" class="img-fluid rounded border p-2 mb-3 shadow-sm" style="max-height: 280px;">
+          
+          <div class="alert alert-warning py-2 small mb-0">
+             Kasir: Cek mutasi masuk di HP, lalu klik konfirmasi di bawah.
+          </div>
+        </div>
+        <div class="modal-footer bg-light p-2 d-flex">
+          <button type="button" class="btn btn-sm btn-secondary flex-grow-1" data-bs-dismiss="modal">Batal</button>
+          <button type="button" id="btn-konfirmasi-qris" class="btn btn-sm btn-success flex-grow-1 fw-bold">Konfirmasi Lunas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalStruk" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white py-2">
+          <h5 class="modal-title small fw-bold">🧾 STRUK BELANJA</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body font-monospace p-3 small" id="struk-content"></div>
+        <div class="modal-footer p-2">
+          <button class="btn btn-sm btn-dark w-100" onclick="window.print()">🖨️ Cetak / Print Struk</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalDetailPesanan" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold" id="detail-modal-title">Detail Pesanan #00</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <p class="mb-1 small text-muted font-monospace">PELANGGAN / TIPE</p>
+            <h6 class="fw-bold text-dark mb-0" id="detail-customer-info">Nama (Dine In)</h6>
+          </div>
+          
+          <div class="mb-3">
+            <p class="mb-1 small text-muted font-monospace">RINCIAN PIZZA</p>
+            <div id="detail-items-container" class="border rounded bg-light p-2"></div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-4 p-2 bg-danger-subtle rounded text-danger">
+            <span class="fw-bold">TOTAL TAGIHAN:</span>
+            <h4 class="fw-bold mb-0" id="detail-total-display">Rp 0</h4>
+          </div>
+
+          <div id="area-aksi-pembayaran">
+            <ul class="nav nav-tabs mb-3" id="paymentTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active small fw-bold" id="cash-tab" data-bs-toggle="tab" data-bs-target="#cash-panel" type="button" role="tab">💵 TUNAI (CASH)</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link small fw-bold text-danger" id="qris-tab" data-bs-toggle="tab" data-bs-target="#qris-panel" type="button" role="tab">📱 TUNJUKKAN QRIS</button>
+              </li>
+            </ul>
+            <div class="tab-content" id="paymentTabContent">
+              <div class="tab-pane fade show active" id="cash-panel" role="tabpanel">
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label small fw-bold text-muted">Uang Diterima (Rp)</label>
+                    <input type="number" id="cash-received" class="form-control form-control-sm" placeholder="Contoh: 100000" oninput="hitungKembalian()">
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small fw-bold text-muted">Uang Kembalian</label>
+                    <input type="text" id="cash-change" class="form-control form-control-sm fw-bold text-success bg-light" readonly value="Rp 0">
+                  </div>
+                </div>
+                <button type="button" id="btn-lunas-cash" class="btn btn-success w-100 fw-bold py-2">KONFIRMASI LUNAS (CASH)</button>
+              </div>
+              
+              <div class="tab-pane fade text-center" id="qris-panel" role="tabpanel">
+                <p class="small text-muted mb-2">Minta pelanggan scan QRIS Gopay Merchant Pribadi:</p>
+                <img src="css/qris.jpeg" alt="QRIS Toko" class="img-fluid rounded border p-2 mb-3 shadow-sm" style="max-height: 200px;">
+                <button type="button" id="btn-lunas-qris" class="btn btn-danger w-100 fw-bold py-2">SUDAH DI-SCAN & LUNAS</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="area-aksi-lunas" class="d-none text-center py-2">
+            <div class="alert alert-success py-2 mb-3 small fw-bold">✓ PESANAN INI SUDAH LUNAS</div>
+            <button type="button" id="btn-cetak-ulang-struk" class="btn btn-outline-dark w-100 fw-bold py-2">🖨️ CETAK ULANG STRUK BELANJA</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="modalEditGambar" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white py-2">
+          <h6 class="modal-title fw-bold mb-0">📸 Perbarui Gambar Menu</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <form id="edit-gambar-form">
+            <input type="hidden" id="edit-menu-id">
+            <div class="mb-3 text-center">
+              <small class="text-muted d-block mb-2">Pilih file foto baru untuk menu ini:</small>
+              <input type="file" id="edit-pizza-image" class="form-control form-control-sm" accept="image/*" required>
+            </div>
+            <button type="submit" id="btn-update-gambar" class="btn btn-sm btn-danger w-100 fw-bold py-2">⚡ Unggah & Perbarui</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/staff.js"></script>
+</body>
+</html>

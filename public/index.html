@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza Express - Lezat & Cepat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .menu-img-container {
+            width: 100%;
+            height: 180px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        .menu-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .card:hover .menu-img {
+            transform: scale(1.05);
+        }
+        .category-divider {
+            border-left: 5px solid #dc3545;
+            padding-left: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Tampilkan bar navigasi keranjang di bawah untuk semua ukuran layar */
+        #mobile-sticky-cart { display: block !important; }
+
+        /* --- RESPONSIVE TOAST (NOTIFIKASI) --- */
+        .custom-toast-container {
+            position: fixed;
+            z-index: 1090;
+            top: 80px;      /* Posisi Desktop: Atas */
+            right: 20px;    /* Posisi Desktop: Kanan */
+        }
+        
+        @media (max-width: 991.98px) {
+            .custom-toast-container {
+                top: auto;
+                bottom: 80px; /* Posisi Mobile: Di atas tombol sticky cart */
+                right: 50%;
+                transform: translateX(50%); /* Rata Tengah */
+                width: 92%;
+            }
+            .custom-toast-container .toast {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light pb-5"> <nav class="navbar navbar-expand-lg navbar-dark bg-danger sticky-top shadow">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">🍕 Pizza Express</a>
+            <div>
+                <button onclick="cekStatusPesanan()" class="btn btn-warning btn-sm rounded-pill px-3 me-2 fw-bold shadow-sm">📍 Lacak Pesanan</button>
+                <a href="login.html" class="btn btn-outline-light btn-sm rounded-pill px-3">Login Staff</a>
+            </div>
+        </div>
+    </nav>
+
+    <div id="promoCarousel" class="carousel slide my-4 shadow-sm container rounded-3 overflow-hidden p-0" data-bs-ride="carousel">
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#promoCarousel" data-bs-slide-to="0" class="active"></button>
+            <button type="button" data-bs-target="#promoCarousel" data-bs-slide-to="1"></button>
+            <button type="button" data-bs-target="#promoCarousel" data-bs-slide-to="2"></button>
+        </div>
+        <div class="carousel-inner" style="max-height: 380px;">
+            <div class="carousel-item active" data-bs-interval="4000">
+                <div class="p-5 text-white bg-dark d-flex flex-column justify-content-center align-items-center text-center" style="height: 350px; background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1200&auto=format&fit=crop') center/cover;">
+                    <h1 class="fw-bold text-warning display-4 mb-2">Selamat Datang di Pizza Express</h1>
+                    <p class="lead">Pesan pizza favoritmu tanpa ribet, langsung siap saji & fresh dari oven!</p>
+                </div>
+            </div>
+            <div class="carousel-item" data-bs-interval="4000">
+                <div class="p-5 text-white bg-dark d-flex flex-column justify-content-center align-items-center text-center" style="height: 350px; background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1541532713592-79a0317b6b77?q=80&w=1200&auto=format&fit=crop') center/cover;">
+                    <h1 class="fw-bold text-warning display-4 mb-2">Pilihan Snack Renyah!</h1>
+                    <p class="lead">Lengkapi harimu dengan keju mozzarella lumer dan sayap ayam pedas.</p>
+                </div>
+            </div>
+            <div class="carousel-item" data-bs-interval="4000">
+                <div class="p-5 text-white bg-dark d-flex flex-column justify-content-center align-items-center text-center" style="height: 350px; background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1497534446932-c925b458314e?q=80&w=1200&auto=format&fit=crop') center/cover;">
+                    <h1 class="fw-bold text-warning display-4 mb-2">Minuman Segar!</h1>
+                    <p class="lead">Hilangkan dahaga dengan racikan teh dan kopi spesial kami.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container my-5">
+        <div class="row">
+            <div class="col-lg-12 mb-4">
+                <h3 class="fw-bold mb-4 text-dark flex-grow-1 text-center">📖 Buku Menu Kuliner</h3>
+                <div class="row" id="menu-container">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-danger" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="custom-toast-container">
+        <div id="cartToast" class="toast border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="4000">
+            <div class="toast-header bg-danger text-white border-0 py-2">
+                <strong class="me-auto">🛒 Keranjang Diperbarui</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body bg-white text-dark fw-bold" style="cursor: pointer;" onclick="scrollToCart()">
+                <span id="toast-message">1 item ditambahkan.</span>
+                <div class="small text-muted fw-normal mt-1 d-block">👉 Klik untuk membuka keranjang</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mobile-sticky-cart" class="position-fixed bottom-0 start-0 w-100 p-3 bg-white border-top shadow-lg" style="display: none; z-index: 1040;">
+        <button class="btn btn-danger w-100 py-3 rounded-pill fw-bold d-flex justify-content-between align-items-center shadow animate-bounce" data-bs-toggle="modal" data-bs-target="#modalMobileCart">
+            <span>🛒 Keranjang (<span id="mobile-cart-count">0</span>)</span>
+            <span id="mobile-cart-total" class="badge bg-white text-danger fs-6 rounded-pill px-3 py-2">Rp 0</span>
+        </button>
+    </div>
+
+    <div class="modal fade" id="modalMobileCart" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content border-0">
+                <div class="modal-header bg-dark text-white py-3">
+                    <h5 class="modal-title fw-bold">🛒 Detail Keranjang Saya</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div id="mobile-cart-items-list" class="mb-3"></div>
+                    
+                    <div class="card p-3 shadow-sm border-0 rounded-3 bg-white mb-3">
+                        <h6 class="fw-bold mb-3">Formulir Identitas Pemesan:</h6>
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted font-monospace">NAMA ANDA</label>
+                            <input type="text" class="form-control" id="mobile-customer-name" placeholder="Ketik nama lengkap">
+                        </div>
+                        <div class="mb-0">
+                            <label class="small fw-bold text-muted font-monospace">TIPE LAYANAN</label>
+                            <select class="form-select" id="mobile-order-type">
+                                <option value="dine in">Dine In (Makan di Sini)</option>
+                                <option value="takeaway">Takeaway (Bawa Pulang)</option>
+                                <option value="delivery">Delivery (Antar Tempat)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white border-top p-3 flex-column">
+                    <div class="d-flex justify-content-between w-100 fw-bold fs-5 mb-3 px-1">
+                        <span>Total Tagihan:</span>
+                        <span id="mobile-modal-total-pay" class="text-danger">Rp 0</span>
+                    </div>
+                    <button type="button" onclick="prosesCheckoutMobile()" id="btn-checkout-mobile" class="btn btn-danger w-100 py-3 fw-bold rounded-pill shadow-sm" disabled>💳 Bayar Sekarang via QRIS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="customerQrisModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg text-center">
+                <div class="modal-header bg-danger text-white py-2 justify-content-center">
+                    <h6 class="modal-title fw-bold mb-0">📱 PEMBAYARAN QRIS GOPAY</h6>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="small text-muted mb-1">Silakan scan QRIS & bayar sebesar:</p>
+                    <h4 class="fw-bold text-danger mb-3" id="customer-qris-total">Rp 0</h4>
+                    <img src="css/qris.jpeg" alt="QRIS Gopay" class="img-fluid rounded border p-2 mb-3 shadow-sm" style="max-height: 260px;">
+                    <div class="alert alert-info py-2 small mb-0 font-monospace">
+                        NO ANTRIAN ANDA: <strong id="customer-qris-queue">#00</strong>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0" style="font-size: 11px;">Setelah melakukan pembayaran, silakan tunjukkan bukti atau beri tahu Kasir untuk memproses makananmu.</p>
+                </div>
+                <div class="modal-footer p-2 d-flex">
+                    <button type="button" class="btn btn-sm btn-outline-danger flex-grow-1 fw-bold" onclick="batalkanPesananQRIS()">❌ Batalkan</button>
+                    <button type="button" id="btn-close-customer-qris" class="btn btn-sm btn-secondary flex-grow-1 fw-bold" data-bs-dismiss="modal" onclick="selesaiDanLunas()">Selesai & Pantau Antrian</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalLacakPesanan" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white py-3">
+                    <h5 class="modal-title fw-bold">📍 Pelacakan Pesanan Saya</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 bg-light text-center" id="tracking-content">
+                    <div class="spinner-border text-danger" role="status"></div>
+                    <p class="mt-2 text-muted small">Memuat status pesanan...</p>
+                </div>
+                <div class="modal-footer p-2 bg-white border-top">
+                    <button type="button" class="btn btn-outline-danger w-100 fw-bold" onclick="cekStatusPesanan()">🔄 Refresh Status Terbaru</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
