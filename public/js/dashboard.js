@@ -270,9 +270,6 @@ async function selesaiDanLunas() {
 // ==========================================
 // 2. SISTEM PELACAKAN PESANAN (LIVE REALTIME)
 // ==========================================
-// Tetapkan variabel channel di tingkat file paling atas (global)
-let trackingSubscription = null;
-
 async function cekStatusPesanan() {
     const orderIdRaw = localStorage.getItem('latest_order_id');
     if (!orderIdRaw) {
@@ -282,7 +279,6 @@ async function cekStatusPesanan() {
     const orderId = parseInt(orderIdRaw);
 
     try {
-        // 1. Inisialisasi Kontrol Modal Bootstrap
         const trackingEl = document.getElementById('modalLacakPesanan');
         let trackingModal = bootstrap.Modal.getInstance(trackingEl);
         if (!trackingModal) {
@@ -293,7 +289,7 @@ async function cekStatusPesanan() {
         const contentContainer = document.getElementById('tracking-content');
         contentContainer.innerHTML = `<div class="spinner-border text-danger"></div><p class="mt-2 text-muted small">Menghubungkan ke dapur...</p>`;
 
-        // 2. Fungsi Internal Render UI Pelacakan
+        // Fungsi Render UI
         async function renderTrackingUI(order) {
             if (!order) {
                 contentContainer.innerHTML = `
@@ -309,14 +305,11 @@ async function cekStatusPesanan() {
             let statusText = '';
             let statusColor = '';
             let progress = 0;
-            let actionHtml = '';
 
-            // Evaluasi Status Alur Logistik Restoran
             if (order.status_pesanan === 'menunggu konfirmasi') {
                 statusText = '⏳ Menunggu Konfirmasi Kasir';
                 statusColor = 'bg-warning text-dark';
                 progress = 25;
-                actionHtml = `<button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>`;
             } else if (order.status_pesanan === 'sedang diproses' || order.status_pesanan === 'dimasak') {
                 statusText = '🍳 Sedang Dimasak Dapur';
                 statusColor = 'bg-primary text-white';
@@ -325,31 +318,10 @@ async function cekStatusPesanan() {
                 statusText = '🛵 Sedang Diantar Kurir';
                 statusColor = 'bg-info text-dark';
                 progress = 75;
-            } else if (order.status_pesanan === 'siap diambil') {
+            } else if (order.status_pesanan === 'siap diambil' || order.status_pesanan === 'selesai') {
                 statusText = '🍕 Pesanan Siap! Silakan Diambil';
                 statusColor = 'bg-success text-white';
                 progress = 100;
-            } else if (order.status_pesanan === 'selesai') {
-                // FITUR BARU: Jika bertipe delivery dan status selesai dari kurir, berikan tombol konfirmasi terima barang
-                if (order.tipe_pesanan === 'delivery') {
-                    statusText = '✅ Pizza Sudah Sampai di Tempat Anda!';
-                    statusColor = 'bg-success text-white';
-                    progress = 100;
-                    actionHtml = `
-                        <div class="alert alert-success small mb-3 fw-bold">Kurir menyatakan pesanan Anda telah sampai tujuan.</div>
-                        <button class="btn btn-danger btn-sm w-100 mb-4 fw-bold py-2 rounded-pill shadow-sm animate-pulse" onclick="akhiriSesiPelanggan()"> Konfirmasi & Terima Pizza</button>
-                    `;
-                } else {
-                    // Kasus Dine In / Takeaway yang diselesaikan langsung oleh kasir
-                    contentContainer.innerHTML = `
-                        <div class="p-3 text-center">
-                            <h5 class="text-success fw-bold">Terima Kasih! 🎉</h5>
-                            <p class="text-muted small mb-0">Pesanan Anda telah diselesaikan. Nikmati hidangan Anda!</p>
-                        </div>`;
-                    localStorage.removeItem('latest_order_id');
-                    isOrderActive = false;
-                    return;
-                }
             }
 
             contentContainer.innerHTML = `
@@ -360,7 +332,9 @@ async function cekStatusPesanan() {
                 <div class="progress mb-4" style="height: 22px;">
                     <div class="progress-bar ${statusColor.split(' ')[0]}" style="width: ${progress}%;"></div>
                 </div>
-                ${actionHtml}
+                ${(order.status_pesanan === 'menunggu konfirmasi') ? `
+                    <button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>
+                ` : ''}
                 <div class="p-3 bg-white border rounded text-start small">
                     <div class="d-flex justify-content-between">
                         <span class="text-muted fw-bold">Total Belanja:</span>
@@ -370,7 +344,7 @@ async function cekStatusPesanan() {
             `;
         }
 
-        // 3. Ambil Snapshot Data Awal
+        // Ambil data snapshot awal
         const { data: ordersData, error: fetchError } = await db.from('orders').select('*').eq('id_order', orderId);
         if (fetchError) throw fetchError;
 
@@ -380,7 +354,7 @@ async function cekStatusPesanan() {
         }
         renderTrackingUI(ordersData[0]);
 
-        // 4. Manajemen Realtime Channel Subscription
+        // Berlangganan Realtime Channel Supabase
         if (trackingSubscription) {
             await db.removeChannel(trackingSubscription);
             trackingSubscription = null;
@@ -389,16 +363,17 @@ async function cekStatusPesanan() {
         trackingSubscription = db.channel(`track-order-channel-${orderId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id_order=eq.${orderId}` }, 
             (payload) => {
-                console.log("Perubahan status pengantaran:", payload);
                 if (payload.eventType === 'DELETE') {
                     renderTrackingUI(null);
                 } else if (payload.eventType === 'UPDATE') {
                     renderTrackingUI(payload.new);
                 }
             })
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'CHANNEL_ERROR') console.error('Koneksi Realtime gagal. Periksa Publication Supabase.');
+            });
 
-        // Bersihkan channel WebSocket saat modal ditutup
+        // Event membersihkan channel saat modal ditutup pelanggan
         trackingEl.addEventListener('hidden.bs.modal', async () => {
             if (trackingSubscription) {
                 await db.removeChannel(trackingSubscription);
@@ -411,19 +386,6 @@ async function cekStatusPesanan() {
         document.getElementById('tracking-content').innerHTML = `
             <div class="alert alert-danger small mb-0">Gagal memuat status pelacakan.</div>`;
     }
-}
-
-// FUNGSI BARU: Mengakhiri sesi pelacakan secara mandiri di sisi pelanggan
-function akhiriSesiPelanggan() {
-    localStorage.removeItem('latest_order_id');
-    isOrderActive = false;
-    
-    const trackingEl = document.getElementById('modalLacakPesanan');
-    const modal = bootstrap.Modal.getInstance(trackingEl);
-    if (modal) modal.hide();
-    
-    alert("Selamat Menikmati Pizza Express! Sesi pelacakan Anda telah ditutup.");
-    location.reload();
 }
 
 async function batalkanPesanan() {
