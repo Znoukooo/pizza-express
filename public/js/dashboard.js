@@ -303,25 +303,71 @@ async function cekStatusPesanan() {
             }
 
             let statusText = '';
-            let statusColor = '';
+            let statusColor = 'bg-secondary text-white';
             let progress = 0;
+            let tombolKonfirmasiHTML = '';
 
-            if (order.status_pesanan === 'menunggu konfirmasi') {
-                statusText = '⏳ Menunggu Konfirmasi Kasir';
-                statusColor = 'bg-warning text-dark';
-                progress = 25;
-            } else if (order.status_pesanan === 'sedang diproses' || order.status_pesanan === 'dimasak') {
-                statusText = '🍳 Sedang Dimasak Dapur';
-                statusColor = 'bg-primary text-white';
-                progress = 50;
-            } else if (order.status_pesanan === 'mencari kurir' || order.status_pesanan === 'diantar') {
-                statusText = '🛵 Sedang Diantar Kurir';
-                statusColor = 'bg-info text-dark';
-                progress = 75;
-            } else if (order.status_pesanan === 'siap diambil' || order.status_pesanan === 'selesai') {
-                statusText = '🍕 Pesanan Siap! Silakan Diambil';
-                statusColor = 'bg-success text-white';
-                progress = 100;
+            // Menyesuaikan dengan status_pesanan_enum yang ada di database Supabase Anda
+            switch (order.status_pesanan) {
+                case 'menunggu konfirmasi':
+                    statusText = '⏳ Menunggu Konfirmasi Kasir';
+                    statusColor = 'bg-warning text-dark';
+                    progress = 20;
+                    break;
+                case 'dimasak':
+                case 'sedang diproses':
+                    statusText = '🍳 Sedang Dimasak Dapur';
+                    statusColor = 'bg-primary text-white';
+                    progress = 40;
+                    break;
+                case 'siap diambil':
+                    if (order.tipe_pesanan === 'delivery') {
+                        statusText = '📦 Pesanan Siap! Menunggu Diambil Kurir';
+                        statusColor = 'bg-info text-dark';
+                    } else {
+                        statusText = '🍕 Pesanan Makanan Siap Diambil!';
+                        statusColor = 'bg-success text-white';
+                    }
+                    progress = 70;
+                    break;
+                case 'dikirim':
+                case 'diantar':
+                case 'mencari kurir':
+                    statusText = '🛵 Pesanan Sedang Diantar oleh Kurir';
+                    statusColor = 'bg-info text-dark';
+                    progress = 85;
+
+                    // KHUSUS DELIVERY: Jika status 'dikirim', tampilkan tombol aksi terima pesanan untuk pelanggan
+                    if (order.tipe_pesanan === 'delivery') {
+                        tombolKonfirmasiHTML = `
+                            <div class="card card-body border-success mt-3 bg-light text-center">
+                                <p class="small text-muted mb-2">Jika pesanan sudah sampai di tangan Anda, silakan konfirmasi:</p>
+                                <button class="btn btn-success w-100 fw-bold shadow-sm" 
+                                    onclick="konfirmasiPesananDiterima(${order.id_order})">
+                                    ✅ Pesanan Sudah Diterima
+                                </button>
+                            </div>
+                        `;
+                    }
+                    break;
+                case 'diterima':
+                    statusText = '📩 Pesanan Telah Diterima Pelanggan';
+                    statusColor = 'bg-success text-white';
+                    progress = 95;
+                    break;
+                case 'sudah diambil':
+                case 'selesai':
+                    statusText = '✨ Pesanan Selesai. Terima kasih!';
+                    statusColor = 'bg-dark text-white';
+                    progress = 100;
+                    
+                    // Sesi berakhir, bersihkan local storage agar bisa melakukan pesanan baru kembali
+                    localStorage.removeItem('latest_order_id');
+                    isOrderActive = false;
+                    break;
+                default:
+                    statusText = order.status_pesanan;
+                    progress = 50;
             }
 
             contentContainer.innerHTML = `
@@ -335,12 +381,17 @@ async function cekStatusPesanan() {
                 ${(order.status_pesanan === 'menunggu konfirmasi') ? `
                     <button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>
                 ` : ''}
-                <div class="p-3 bg-white border rounded text-start small">
+                <div class="p-3 bg-white border rounded text-start small mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Tipe Layanan:</span>
+                        <span class="badge bg-secondary">${order.tipe_pesanan.toUpperCase()}</span>
+                    </div>
                     <div class="d-flex justify-content-between">
                         <span class="text-muted fw-bold">Total Belanja:</span>
                         <strong>Rp ${order.total_bayar.toLocaleString('id-ID')}</strong>
                     </div>
                 </div>
+                ${tombolKonfirmasiHTML}
             `;
         }
 
@@ -385,6 +436,30 @@ async function cekStatusPesanan() {
         console.error("DEBUG INTERNAL ERROR:", err);
         document.getElementById('tracking-content').innerHTML = `
             <div class="alert alert-danger small mb-0">Gagal memuat status pelacakan.</div>`;
+    }
+}
+
+// Ganti fungsi konfirmasiPesananDiterima paling bawah dengan alur baru ini
+async function konfirmasiPesananDiterima(orderId) {
+    if (confirm("Apakah Anda yakin pesanan telah diterima dengan baik?")) {
+        try {
+            // Sesuai permintaan: Delivery berakhir di 'diterima' lalu otomatis diset ke 'selesai'
+            const { error } = await db.from('orders')
+                .update({ status_pesanan: 'diterima' })
+                .eq('id_order', orderId);
+            
+            if (error) throw error;
+            
+            // Otomatis tutup arsip ke 'selesai' agar masuk ke riwayat kasir
+            await db.from('orders').update({ status_pesanan: 'selesai' }).eq('id_order', orderId);
+            
+            alert("Terima kasih! Sesi pesanan Anda telah selesai.");
+            localStorage.removeItem('latest_order_id');
+            location.reload();
+        } catch (err) {
+            console.error(err);
+            alert("Gagal mengonfirmasi penerimaan pesanan.");
+        }
     }
 }
 
@@ -433,6 +508,29 @@ async function batalkanPesananQRIS() {
         } catch (err) {
             console.error(err);
             alert("Gagal membatalkan pesanan.");
+        }
+    }
+}
+
+// Tambahkan fungsi ini ke dashboard.js
+async function konfirmasiPesananDiterima(orderId) {
+    if (confirm("Apakah Anda yakin pesanan telah diterima?")) {
+        try {
+            // Update status pesanan di database menjadi 'selesai'
+            const { error } = await db.from('orders')
+                .update({ status_pesanan: 'selesai' })
+                .eq('id_order', orderId);
+            
+            if (error) throw error;
+            
+            alert("Terima kasih! Pesanan telah selesai.");
+            
+            // Bersihkan local storage agar pelanggan bisa memesan lagi
+            localStorage.removeItem('latest_order_id');
+            location.reload();
+        } catch (err) {
+            console.error(err);
+            alert("Gagal mengonfirmasi pesanan.");
         }
     }
 }

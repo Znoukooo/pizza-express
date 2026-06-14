@@ -68,7 +68,7 @@ async function loadKasirData() {
     
     orders.forEach(o => {
         // Jika pesanan sudah LUNAS dan statusnya SELESAI, masuk ke RIWAYAT/ARSIP
-        if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'selesai') {
+        if (o.status_pembayaran === 'lunas' && (o.status_pesanan === 'selesai' || o.status_pesanan === 'sudah diambil')) {
             tbodyRiwayat.innerHTML += `
                 <tr>
                     <td><strong>#${o.no_antrian}</strong></td>
@@ -84,26 +84,33 @@ async function loadKasirData() {
             `;
         } 
         else {
-            let actionBtn = '';
-            
-            // FITUR BARU: Jika pembayaran lunas dan makanan sudah SIAP DIAMBIL (dari dapur/kurir)
-            if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'siap diambil') {
-                actionBtn = `
-                    <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
-                    <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'selesai')">🏁 Selesaikan Pesanan</button>
-                `;
-            } 
-            // Jika pembayaran lunas tapi masih menunggu konfirmasi awal dari kasir
-            else if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'menunggu konfirmasi') {
-                actionBtn = `<button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'dimasak')">Kirim ke Dapur</button>`;
-            } 
-            // Kondisi default (belum bayar / sedang dimasak / diantar)
-            else {
-                actionBtn = `
-                    <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
-                    <button class="btn btn-sm btn-danger fw-bold rounded-pill px-2 shadow-sm" onclick="hapusPesanan(${o.id_order})">🗑️ Hapus</button>
-                `;
-            }
+           // Ganti bagian penentuan actionBtn di dalam loop orders.forEach pada fungsi loadKasirData():
+let actionBtn = '';
+
+// KONDISI 1: Dine in / Takeaway yang sudah 'siap diambil' diselesaikan oleh Kasir menjadi 'sudah diambil'
+if ((o.tipe_pesanan === 'dine in' || o.tipe_pesanan === 'takeaway') && o.status_pesanan === 'siap diambil') {
+    actionBtn = `
+        <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
+        <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'sudah diambil')">🥡 Sudah Diambil</button>
+    `;
+} 
+// KONDISI 2: Jika status_pesanan sudah 'sudah diambil' atau 'selesai' tapi belum masuk arsip utama
+else if (o.status_pesanan === 'sudah diambil' || o.status_pesanan === 'selesai') {
+    actionBtn = `
+        <button class="btn btn-sm btn-outline-dark fw-bold rounded-pill px-3" onclick="cetakStrukOtomatis(${o.id_order})">🖨️ Struk</button>
+    `;
+}
+// KONDISI 3: Jika pembayaran lunas tapi masih menunggu konfirmasi awal dari kasir untuk dikirim ke dapur
+else if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'menunggu konfirmasi') {
+    actionBtn = `<button class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'dimasak')">Kirim ke Dapur</button>`;
+} 
+// Kondisi default lainnya (sedang dimasak, dikirim, dll)
+else {
+    actionBtn = `
+        <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
+        <button class="btn btn-sm btn-outline-danger fw-bold rounded-pill px-2 shadow-sm" onclick="hapusPesanan(${o.id_order})">🗑️ Hapus</button>
+    `;
+}
 
             tbodyAktif.innerHTML += `
                 <tr>
@@ -514,21 +521,22 @@ async function loadDapurData() {
             }
             detailsHtml += '</ul>';
 
-            let actionButtons = '';
-            if (o.status_pesanan === 'dimasak') {
-                actionButtons = `
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-warning btn-sm w-100 fw-bold shadow-sm" onclick="terimaPesananDapur(${o.id_order})">👨‍🍳 Mulai Masak</button>
-                    </div>
-                `;
-            } else if (o.status_pesanan === 'sedang diproses') {
-                const nextStatus = o.tipe_pesanan === 'delivery' ? 'mencari kurir' : 'siap diambil';
-                actionButtons = `
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-success btn-sm w-100 fw-bold shadow-sm" onclick="updateStatus(${o.id_order}, '${nextStatus}')">✅ Selesai Masak</button>
-                    </div>
-                `;
-            }
+            // Cari penentuan actionButtons di dalam loop orders.forEach pada fungsi loadDapurData():
+let actionButtons = '';
+if (o.status_pesanan === 'dimasak') {
+    actionButtons = `
+        <div class="d-flex gap-2">
+            <button class="btn btn-warning btn-sm w-100 fw-bold shadow-sm" onclick="terimaPesananDapur(${o.id_order})">👨‍🍳 Mulai Masak</button>
+        </div>
+    `;
+} else if (o.status_pesanan === 'sedang diproses') {
+    // Seluruh tipe pesanan (delivery, dine in, takeaway) diarahkan ke 'siap diambil' saat beres dimasak
+    actionButtons = `
+        <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm w-100 fw-bold shadow-sm" onclick="updateStatus(${o.id_order}, 'siap diambil')">✅ Selesai Masak</button>
+        </div>
+    `;
+}
 
             const deleteButton = `
                 <button class="btn btn-outline-danger btn-sm px-2 py-0 border-0" title="Hapus Pesanan Ini" onclick="hapusPesananDapur(${o.id_order})">🗑️</button>
@@ -588,18 +596,34 @@ async function hapusPesananDapur(id) {
     }
 }
 
+// Ganti fungsi loadKurirData() di dalam staff.js dengan ini:
 async function loadKurirData() {
-    const { data: orders } = await db.from('orders').select('*').in('status_pesanan', ['mencari kurir', 'diantar']);
+    // Kurir memantau pesanan delivery yang 'siap diambil' (siap diantar) atau yang sedang dalam status 'dikirim'
+    const { data: orders, error } = await db.from('orders')
+        .select('*')
+        .eq('tipe_pesanan', 'delivery')
+        .in('status_pesanan', ['siap diambil', 'dikirim', 'diantar']);
+        
+    if (error) return console.error(error);
+
     const container = document.getElementById('kurir-orders-container');
     if (container) {
-        container.innerHTML = orders.length === 0 ? '<p class="text-muted text-center p-3">Belum ada pizza delivery.</p>' : '';
+        container.innerHTML = orders.length === 0 ? '<p class="text-muted text-center p-3">Belum ada pizza delivery aktif.</p>' : '';
         orders.forEach(o => {
-            let actionBtn = o.status_pesanan === 'mencari kurir' 
-                ? `<button class="btn btn-sm btn-info text-white" onclick="updateStatus(${o.id_order}, 'diantar')">Ambil Pengantaran</button>`
-                : `<button class="btn btn-sm btn-success" onclick="updateStatus(${o.id_order}, 'selesai')">Selesai Diantar</button>`;
+            let actionBtn = '';
+            
+            if (o.status_pesanan === 'siap diambil') {
+                actionBtn = `<button class="btn btn-sm btn-info text-white fw-bold px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'dikirim')">🛵 Ambil & Antar Pesanan</button>`;
+            } else if (o.status_pesanan === 'dikirim') {
+                actionBtn = `<span class="badge bg-warning text-dark py-2 px-3">⌛ Menunggu Konfirmasi Pelanggan</span>`;
+            }
+            
             container.innerHTML += `
-                <div class="list-group-item d-flex justify-content-between align-items-center mb-2 rounded border shadow-sm">
-                    <div><strong>#${o.no_antrian} - ${o.nama_pelanggan}</strong> <span class="badge bg-secondary ms-2">${o.status_pesanan}</span></div>
+                <div class="list-group-item d-flex justify-content-between align-items-center mb-2 rounded border shadow-sm p-3 bg-white">
+                    <div>
+                        <strong class="text-danger">#${o.no_antrian} - ${o.nama_pelanggan}</strong> 
+                        <div class="small text-muted mt-1">Status saat ini: <span class="badge bg-dark">${o.status_pesanan.toUpperCase()}</span></div>
+                    </div>
                     ${actionBtn}
                 </div>
             `;
