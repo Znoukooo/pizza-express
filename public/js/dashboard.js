@@ -1,11 +1,10 @@
 // ==========================================
 // 1. KONFIGURASI KREDENSIAL & INITIALIZATION
 // ==========================================
-const LOCAL_URL = 'https://umidsquubznxdmlcelcl.supabase.co'; 
-const LOCAL_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtaWRzcXV1YnpueGRtbGNlbGNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNDcwNjAsImV4cCI6MjA5NjkyMzA2MH0.BJTpQFASv1A4f0SsidaYKTTB4RI3Zvax0HuLdJuE5ls';
+const SUPABASE_URL = 'https://umidsquubznxdmlcelcl.supabase.co'; 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtaWRzcXV1YnpueGRtbGNlbGNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNDcwNjAsImV4cCI6MjA5NjkyMzA2MH0.BJTpQFASv1A4f0SsidaYKTTB4RI3Zvax0HuLdJuE5ls';
 
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const db = supabase.createClient(isLocal ? LOCAL_URL : window._env_?.SUPABASE_URL, isLocal ? LOCAL_KEY : window._env_?.SUPABASE_ANON_KEY);
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let cart = {};
 let currentCheckoutOrderId = null;
@@ -13,22 +12,19 @@ let menuData = [];
 let isOrderActive = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    await checkActiveOrder(); // Panggil pengecekan antrean terlebih dahulu
+    await checkActiveOrder(); 
     await fetchMenu();
-    // (Event listener checkout desktop dihapus karena form desktop sudah tidak ada)
 });
 
-// FUNGSI BARU: Mengecek apakah device ini punya tunggakan pesanan
+// FUNGSI: Mengecek apakah device ini punya tunggakan pesanan
 async function checkActiveOrder() {
     const orderId = localStorage.getItem('latest_order_id');
     if (!orderId) return;
 
     try {
-        // Ambil status pesanan terakhir dari database
         const { data: order, error } = await db.from('orders').select('status_pesanan').eq('id_order', orderId).single();
-        if (error) return; // Abaikan jika pesanan ternyata sudah dihapus admin
+        if (error) return; 
 
-        // Kunci keranjang JIKA pesanan BUKAN 'selesai' DAN BUKAN 'siap diambil'
         if (order.status_pesanan !== 'selesai' && order.status_pesanan !== 'siap diambil') {
             isOrderActive = true;
         } else {
@@ -39,50 +35,57 @@ async function checkActiveOrder() {
     }
 }
 
+// FUNGSI: Ambil data menu kuliner
 async function fetchMenu() {
-    const { data, error } = await db.from('menu').select('*').order('kategori', { ascending: true });
-    if (error) return console.error(error);
-    
-    menuData = data;
     const container = document.getElementById('menu-container');
-    container.innerHTML = '';
-
-    const groupedMenu = data.reduce((acc, item) => {
-        const cat = item.kategori || 'General';
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(item);
-        return acc;
-    }, {});
-
-    for (const [kategori, items] of Object.entries(groupedMenu)) {
-        container.innerHTML += `<div class="col-12 mt-4 mb-3"><h4 class="category-divider fs-5">${kategori.toUpperCase()}</h4></div>`;
+    try {
+        const { data, error } = await db.from('menu').select('*').order('kategori', { ascending: true });
+        if (error) throw error;
         
-        items.forEach(item => {
-            let defaultImage = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=400&auto=format&fit=crop';
-            if (item.kategori === 'Minuman') defaultImage = 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=400&auto=format&fit=crop';
-            else if (item.kategori === 'Snack') defaultImage = 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?q=80&w=400&auto=format&fit=crop';
-            else if (item.kategori === 'Premium' || item.kategori === 'Signature') defaultImage = 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=400&auto=format&fit=crop';
+        menuData = data;
+        container.innerHTML = '';
 
-            const finalImage = item.gambar_url ? item.gambar_url : defaultImage;
+        const groupedMenu = data.reduce((acc, item) => {
+            const cat = item.kategori || 'General';
+            if (!acc[cat]) acc[cat] = [];
+            acc[cat].push(item);
+            return acc;
+        }, {});
 
-            container.innerHTML += `
-                <div class="col-md-6 col-lg-4 mb-4"> <div class="card h-100 shadow-sm border-0 rounded-3 overflow-hidden">
-                        <div class="menu-img-container">
-                            <img src="${finalImage}" alt="${item.nama_pizza}" class="menu-img" loading="lazy">
-                        </div>
-                        <div class="card-body p-3 d-flex flex-column justify-content-between">
-                            <div>
-                                <h6 class="fw-bold text-dark mb-1">${item.nama_pizza}</h6>
-                                <p class="text-danger fw-bold mb-0 small">Rp ${item.harga.toLocaleString('id-ID')}</p>
+        for (const [kategori, items] of Object.entries(groupedMenu)) {
+            container.innerHTML += `<div class="col-12 mt-4 mb-3"><h4 class="category-divider fs-5">${kategori.toUpperCase()}</h4></div>`;
+            
+            items.forEach(item => {
+                let defaultImage = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=400&auto=format&fit=crop';
+                if (item.kategori === 'Minuman') defaultImage = 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=400&auto=format&fit=crop';
+                else if (item.kategori === 'Snack') defaultImage = 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?q=80&w=400&auto=format&fit=crop';
+                else if (item.kategori === 'Premium' || item.kategori === 'Signature') defaultImage = 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=400&auto=format&fit=crop';
+
+                const finalImage = item.gambar_url ? item.gambar_url : defaultImage;
+
+                container.innerHTML += `
+                    <div class="col-md-6 col-lg-4 mb-4"> 
+                        <div class="card h-100 shadow-sm border-0 rounded-3 overflow-hidden">
+                            <div class="menu-img-container">
+                                <img src="${finalImage}" alt="${item.nama_pizza}" class="menu-img" loading="lazy">
                             </div>
-                            <button class="btn btn-sm btn-outline-danger w-100 rounded-pill mt-3 fw-bold" onclick="addToCart(${item.id_menu})">
-                                ➕ Masukkan Keranjang
-                            </button>
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-1">${item.nama_pizza}</h6>
+                                    <p class="text-danger fw-bold mb-0 small">Rp ${item.harga.toLocaleString('id-ID')}</p>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger w-100 rounded-pill mt-3 fw-bold" onclick="addToCart(${item.id_menu})">
+                                    ➕ Masukkan Keranjang
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
+    } catch (err) {
+        console.error("Gagal memuat menu:", err);
+        container.innerHTML = `<div class="col-12 text-center text-danger py-5">Gagal mengambil data menu dari database.</div>`;
     }
 }
 
@@ -90,10 +93,9 @@ async function fetchMenu() {
 // SISTEM KENDALI KERANJANG (ADD, MINUS, REMOVE)
 // -------------------------------------------------------------
 function addToCart(id) {
-    // BLOK PENCEGAT: Hentikan fungsi jika ada pesanan aktif
     if (isOrderActive) {
         alert("Selesaikan atau ambil pesanan Anda sebelumnya terlebih dahulu sebelum memesan lagi!");
-        cekStatusPesanan(); // Otomatis tampilkan progress antrean
+        cekStatusPesanan(); 
         return; 
     }
 
@@ -139,7 +141,6 @@ function updateCartDOM() {
         mobContainer.innerHTML = '<p class="text-muted text-center py-4 mb-0 small">Belum ada menu yang dipilih.</p>';
         mobTotal.innerText = 'Rp 0';
         btnMobCheckout.disabled = true;
-        
         stickyBar.style.setProperty('display', 'none', 'important'); 
         return;
     }
@@ -168,12 +169,10 @@ function updateCartDOM() {
     });
 
     mobContainer.innerHTML = htmlContent;
-
     const formattedTotal = `Rp ${total.toLocaleString('id-ID')}`;
     mobTotal.innerText = formattedTotal;
     stickyTotal.innerText = formattedTotal;
     stickyCount.innerText = count;
-
     btnMobCheckout.disabled = false;
 }
 
@@ -195,7 +194,6 @@ function scrollToCart() {
     const toast = bootstrap.Toast.getInstance(toastEl);
     if(toast) toast.hide();
 
-    // Selalu buka Modal Keranjang (Karena panel keranjang PC sudah dihilangkan)
     const modalEl = document.getElementById('modalMobileCart');
     const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     modal.show();
@@ -210,7 +208,6 @@ async function prosesCheckoutMobile() {
     
     if (!name) return alert("Silakan ketik nama Anda terlebih dahulu di formulir pemesan!");
     
-    // Tutup Modal Keranjang saat proses bayar
     const modalEl = document.getElementById('modalMobileCart');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
@@ -218,7 +215,6 @@ async function prosesCheckoutMobile() {
     await submitOrderToDatabase(name, type);
 }
 
-// FUNGSI INTI MENYIMPAN TRANSAKSI
 async function submitOrderToDatabase(customerName, orderType) {
     const totalPay = Object.values(cart).reduce((sum, item) => sum + (item.harga * item.qty), 0);
     const queueNum = Math.floor(Math.random() * 100) + 1;
@@ -235,11 +231,8 @@ async function submitOrderToDatabase(customerName, orderType) {
 
         if (orderErr) throw orderErr;
         
-        // Simpan referensi ID pesanan untuk fungsi pelacakan & update lunas
         localStorage.setItem('latest_order_id', order.id_order);
         currentCheckoutOrderId = order.id_order; 
-        
-        // Kunci device setelah berhasil order
         isOrderActive = true; 
 
         const detailsPayload = Object.values(cart).map(item => ({
@@ -252,21 +245,14 @@ async function submitOrderToDatabase(customerName, orderType) {
         const { error: detailErr } = await db.from('order_details').insert(detailsPayload);
         if (detailErr) throw detailErr;
 
-        // Tampilkan Modal QRIS
         document.getElementById('customer-qris-total').innerText = `Rp ${totalPay.toLocaleString('id-ID')}`;
         document.getElementById('customer-qris-queue').innerText = `#${queueNum}`;
         const qrisModal = new bootstrap.Modal(document.getElementById('customerQrisModal'));
         qrisModal.show();
 
-        // ---------------------------------------------------------
-        // RESET KERANJANG AMAN DARI NULL
-        // ---------------------------------------------------------
         cart = {};
-        
-        // Hanya reset input nama pada form mobile
         const mobileNameInput = document.getElementById('mobile-customer-name');
         if (mobileNameInput) mobileNameInput.value = '';
-        
         updateCartDOM();
 
     } catch (err) {
@@ -275,7 +261,6 @@ async function submitOrderToDatabase(customerName, orderType) {
     }
 }
 
-// FUNGSI UPDATE STATUS LUNAS SAAT PELANGGAN KLIK SELESAI
 async function selesaiDanLunas() {
     if (currentCheckoutOrderId) {
         try {
@@ -295,7 +280,6 @@ async function selesaiDanLunas() {
 // -------------------------------------------------------------
 async function cekStatusPesanan() {
     const orderId = localStorage.getItem('latest_order_id');
-    
     if (!orderId) {
         alert("Belum ada pesanan yang tercatat di perangkat ini.");
         return;
@@ -328,37 +312,30 @@ async function cekStatusPesanan() {
             statusColor = 'bg-info text-dark';
             progress = 75;
         } else if (order.status_pesanan === 'siap diambil' || order.status_pesanan === 'selesai') {
-            // JIKA STATUS SUDAH "SIAP DIAMBIL" ATAU "SELESAI", KITA KOSONGKAN/TUTUP MODAL
             const modalEl = document.getElementById('modalLacakPesanan');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
             
-            // Opsional: Hapus ID dari localStorage agar pelanggan bisa pesan lagi
             if (order.status_pesanan === 'selesai') {
                 localStorage.removeItem('latest_order_id');
                 isOrderActive = false;
             }
-            
-            return; // Berhenti di sini, tidak perlu render konten ke modal
+            return; 
         }
 
         document.getElementById('tracking-content').innerHTML = `
             <div class="mb-3 border-bottom pb-3">
                 <h4 class="fw-bold mb-0 text-danger">Antrian #${order.no_antrian}</h4>
             </div>
-            
             <div class="badge ${statusColor} fs-6 px-4 py-2 mb-3 shadow-sm w-100">
                 ${statusText}
             </div>
-            
             <div class="progress mb-4" style="height: 22px;">
                 <div class="progress-bar ${statusColor.split(' ')[0]}" style="width: ${progress}%;"></div>
             </div>
-
             ${(order.status_pesanan === 'menunggu konfirmasi') ? `
                 <button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>
             ` : ''}
-            
             <div class="p-3 bg-white border rounded text-start small">
                 <div class="d-flex justify-content-between">
                     <span class="text-muted fw-bold">Total:</span>
@@ -366,35 +343,30 @@ async function cekStatusPesanan() {
                 </div>
             </div>
         `;
-
     } catch (err) {
         console.error(err);
         document.getElementById('tracking-content').innerHTML = `<div class="alert alert-danger small">Gagal memuat status pesanan.</div>`;
     }
 }
 
-// FUNGSI BARU: Membatalkan pesanan dari sisi pelanggan
 async function batalkanPesanan() {
     const orderId = localStorage.getItem('latest_order_id');
     if (!orderId) return;
 
     if (confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) {
         try {
-            // Hapus detail dan pesanan utama
             await db.from('order_details').delete().eq('id_order', orderId);
             await db.from('orders').delete().eq('id_order', orderId);
             
-            // Reset status device
             localStorage.removeItem('latest_order_id');
             isOrderActive = false;
             
-            // Tutup modal dan beri notifikasi
             const modalEl = document.getElementById('modalLacakPesanan');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
             
             alert("Pesanan berhasil dibatalkan.");
-            location.reload(); // Refresh agar tombol kembali aktif
+            location.reload(); 
         } catch (err) {
             console.error(err);
             alert("Gagal membatalkan pesanan.");
@@ -407,21 +379,18 @@ async function batalkanPesananQRIS() {
 
     if (confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) {
         try {
-            // Hapus detail dan pesanan utama di database
             await db.from('order_details').delete().eq('id_order', currentCheckoutOrderId);
             await db.from('orders').delete().eq('id_order', currentCheckoutOrderId);
             
-            // Reset status device
             localStorage.removeItem('latest_order_id');
             isOrderActive = false;
             
-            // Tutup modal
             const modalEl = document.getElementById('customerQrisModal');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
             
             alert("Pesanan berhasil dibatalkan.");
-            location.reload(); // Refresh halaman agar pelanggan bisa pesan lagi
+            location.reload(); 
         } catch (err) {
             console.error(err);
             alert("Gagal membatalkan pesanan.");
