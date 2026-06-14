@@ -67,6 +67,7 @@ async function loadKasirData() {
     tbodyRiwayat.innerHTML = '';
     
     orders.forEach(o => {
+        // Jika pesanan sudah LUNAS dan statusnya SELESAI, masuk ke RIWAYAT/ARSIP
         if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'selesai') {
             tbodyRiwayat.innerHTML += `
                 <tr>
@@ -84,9 +85,20 @@ async function loadKasirData() {
         } 
         else {
             let actionBtn = '';
-            if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'menunggu konfirmasi') {
+            
+            // FITUR BARU: Jika pembayaran lunas dan makanan sudah SIAP DIAMBIL (dari dapur/kurir)
+            if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'siap diambil') {
+                actionBtn = `
+                    <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
+                    <button class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'selesai')">🏁 Selesaikan Pesanan</button>
+                `;
+            } 
+            // Jika pembayaran lunas tapi masih menunggu konfirmasi awal dari kasir
+            else if (o.status_pembayaran === 'lunas' && o.status_pesanan === 'menunggu konfirmasi') {
                 actionBtn = `<button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" onclick="updateStatus(${o.id_order}, 'dimasak')">Kirim ke Dapur</button>`;
-            } else {
+            } 
+            // Kondisi default (belum bayar / sedang dimasak / diantar)
+            else {
                 actionBtn = `
                     <button class="btn btn-sm btn-dark fw-bold rounded-pill px-2 shadow-sm me-1" onclick="bukaDetailPesanan(${o.id_order})">🔍 Detail</button>
                     <button class="btn btn-sm btn-danger fw-bold rounded-pill px-2 shadow-sm" onclick="hapusPesanan(${o.id_order})">🗑️ Hapus</button>

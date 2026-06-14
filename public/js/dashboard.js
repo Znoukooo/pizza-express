@@ -10,6 +10,7 @@ let cart = {};
 let currentCheckoutOrderId = null;
 let menuData = [];
 let isOrderActive = false;
+let trackingSubscription = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     await checkActiveOrder(); 
@@ -121,9 +122,6 @@ function removeCartItem(id) {
     updateCartDOM();
 }
 
-// -------------------------------------------------------------
-// RENDERING UI KERANJANG (SINKRONISASI MODAL MOBILE-FIRST)
-// -------------------------------------------------------------
 function updateCartDOM() {
     const mobContainer = document.getElementById('mobile-cart-items-list');
     const mobTotal = document.getElementById('mobile-modal-total-pay');
@@ -176,9 +174,6 @@ function updateCartDOM() {
     btnMobCheckout.disabled = false;
 }
 
-// -------------------------------------------------------------
-// SISTEM NOTIFIKASI & NAVIGASI
-// -------------------------------------------------------------
 function showToast(namaProduk) {
     const totalItems = Object.values(cart).reduce((sum, item) => sum + item.qty, 0);
     const toastMessage = document.getElementById('toast-message');
@@ -199,9 +194,6 @@ function scrollToCart() {
     modal.show();
 }
 
-// -------------------------------------------------------------
-// SISTEM CHECKOUT (TERPUSAT UNTUK MOBILE MODAL)
-// -------------------------------------------------------------
 async function prosesCheckoutMobile() {
     const name = document.getElementById('mobile-customer-name').value;
     const type = document.getElementById('mobile-order-type').value;
@@ -275,77 +267,124 @@ async function selesaiDanLunas() {
     }
 }
 
-// -------------------------------------------------------------
-// SISTEM PELACAKAN PESANAN (LIVE TRACKING)
-// -------------------------------------------------------------
+// ==========================================
+// 2. SISTEM PELACAKAN PESANAN (LIVE REALTIME)
+// ==========================================
 async function cekStatusPesanan() {
-    const orderId = localStorage.getItem('latest_order_id');
-    if (!orderId) {
+    const orderIdRaw = localStorage.getItem('latest_order_id');
+    if (!orderIdRaw) {
         alert("Belum ada pesanan yang tercatat di perangkat ini.");
         return;
     }
+    const orderId = parseInt(orderIdRaw);
 
     try {
         const trackingEl = document.getElementById('modalLacakPesanan');
-        const trackingModal = bootstrap.Modal.getInstance(trackingEl) || new bootstrap.Modal(trackingEl);
+        let trackingModal = bootstrap.Modal.getInstance(trackingEl);
+        if (!trackingModal) {
+            trackingModal = new bootstrap.Modal(trackingEl);
+        }
         trackingModal.show();
         
-        document.getElementById('tracking-content').innerHTML = `<div class="spinner-border text-danger"></div><p class="mt-2 text-muted small">Memuat...</p>`;
+        const contentContainer = document.getElementById('tracking-content');
+        contentContainer.innerHTML = `<div class="spinner-border text-danger"></div><p class="mt-2 text-muted small">Menghubungkan ke dapur...</p>`;
 
-        const { data: order, error } = await db.from('orders').select('*').eq('id_order', orderId).single();
-        if (error) throw error;
-
-        let statusText = '';
-        let statusColor = '';
-        let progress = 0;
-
-        if (order.status_pesanan === 'menunggu konfirmasi') {
-            statusText = '⏳ Menunggu Konfirmasi Kasir';
-            statusColor = 'bg-warning text-dark';
-            progress = 25;
-        } else if (order.status_pesanan === 'dimasak') {
-            statusText = '🍳 Sedang Dimasak Dapur';
-            statusColor = 'bg-primary text-white';
-            progress = 50;
-        } else if (order.status_pesanan === 'mencari kurir' || order.status_pesanan === 'diantar') {
-            statusText = '🛵 Sedang Diantar Kurir';
-            statusColor = 'bg-info text-dark';
-            progress = 75;
-        } else if (order.status_pesanan === 'siap diambil' || order.status_pesanan === 'selesai') {
-            const modalEl = document.getElementById('modalLacakPesanan');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            
-            if (order.status_pesanan === 'selesai') {
+        // Fungsi Render UI
+        async function renderTrackingUI(order) {
+            if (!order) {
+                contentContainer.innerHTML = `
+                    <div class="p-3 text-center">
+                        <h5 class="text-muted fw-bold">Pesanan Selesai / Diakhiri ✨</h5>
+                        <p class="text-muted small mb-0">Pesanan Anda sudah diselesaikan atau diarsip oleh dapur.</p>
+                    </div>`;
                 localStorage.removeItem('latest_order_id');
                 isOrderActive = false;
+                return;
             }
-            return; 
+
+            let statusText = '';
+            let statusColor = '';
+            let progress = 0;
+
+            if (order.status_pesanan === 'menunggu konfirmasi') {
+                statusText = '⏳ Menunggu Konfirmasi Kasir';
+                statusColor = 'bg-warning text-dark';
+                progress = 25;
+            } else if (order.status_pesanan === 'sedang diproses' || order.status_pesanan === 'dimasak') {
+                statusText = '🍳 Sedang Dimasak Dapur';
+                statusColor = 'bg-primary text-white';
+                progress = 50;
+            } else if (order.status_pesanan === 'mencari kurir' || order.status_pesanan === 'diantar') {
+                statusText = '🛵 Sedang Diantar Kurir';
+                statusColor = 'bg-info text-dark';
+                progress = 75;
+            } else if (order.status_pesanan === 'siap diambil' || order.status_pesanan === 'selesai') {
+                statusText = '🍕 Pesanan Siap! Silakan Diambil';
+                statusColor = 'bg-success text-white';
+                progress = 100;
+            }
+
+            contentContainer.innerHTML = `
+                <div class="mb-3 border-bottom pb-3">
+                    <h4 class="fw-bold mb-0 text-danger">Antrian #${order.no_antrian}</h4>
+                </div>
+                <div class="badge ${statusColor} fs-6 px-4 py-2 mb-3 shadow-sm w-100">${statusText}</div>
+                <div class="progress mb-4" style="height: 22px;">
+                    <div class="progress-bar ${statusColor.split(' ')[0]}" style="width: ${progress}%;"></div>
+                </div>
+                ${(order.status_pesanan === 'menunggu konfirmasi') ? `
+                    <button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>
+                ` : ''}
+                <div class="p-3 bg-white border rounded text-start small">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted fw-bold">Total Belanja:</span>
+                        <strong>Rp ${order.total_bayar.toLocaleString('id-ID')}</strong>
+                    </div>
+                </div>
+            `;
         }
 
-        document.getElementById('tracking-content').innerHTML = `
-            <div class="mb-3 border-bottom pb-3">
-                <h4 class="fw-bold mb-0 text-danger">Antrian #${order.no_antrian}</h4>
-            </div>
-            <div class="badge ${statusColor} fs-6 px-4 py-2 mb-3 shadow-sm w-100">
-                ${statusText}
-            </div>
-            <div class="progress mb-4" style="height: 22px;">
-                <div class="progress-bar ${statusColor.split(' ')[0]}" style="width: ${progress}%;"></div>
-            </div>
-            ${(order.status_pesanan === 'menunggu konfirmasi') ? `
-                <button class="btn btn-outline-danger btn-sm w-100 mb-4 fw-bold" onclick="batalkanPesanan()">❌ Batalkan Pesanan</button>
-            ` : ''}
-            <div class="p-3 bg-white border rounded text-start small">
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted fw-bold">Total:</span>
-                    <strong>Rp ${order.total_bayar.toLocaleString('id-ID')}</strong>
-                </div>
-            </div>
-        `;
+        // Ambil data snapshot awal
+        const { data: ordersData, error: fetchError } = await db.from('orders').select('*').eq('id_order', orderId);
+        if (fetchError) throw fetchError;
+
+        if (!ordersData || ordersData.length === 0) {
+            renderTrackingUI(null);
+            return;
+        }
+        renderTrackingUI(ordersData[0]);
+
+        // Berlangganan Realtime Channel Supabase
+        if (trackingSubscription) {
+            await db.removeChannel(trackingSubscription);
+            trackingSubscription = null;
+        }
+
+        trackingSubscription = db.channel(`track-order-channel-${orderId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id_order=eq.${orderId}` }, 
+            (payload) => {
+                if (payload.eventType === 'DELETE') {
+                    renderTrackingUI(null);
+                } else if (payload.eventType === 'UPDATE') {
+                    renderTrackingUI(payload.new);
+                }
+            })
+            .subscribe((status) => {
+                if (status === 'CHANNEL_ERROR') console.error('Koneksi Realtime gagal. Periksa Publication Supabase.');
+            });
+
+        // Event membersihkan channel saat modal ditutup pelanggan
+        trackingEl.addEventListener('hidden.bs.modal', async () => {
+            if (trackingSubscription) {
+                await db.removeChannel(trackingSubscription);
+                trackingSubscription = null;
+            }
+        }, { once: true });
+
     } catch (err) {
-        console.error(err);
-        document.getElementById('tracking-content').innerHTML = `<div class="alert alert-danger small">Gagal memuat status pesanan.</div>`;
+        console.error("DEBUG INTERNAL ERROR:", err);
+        document.getElementById('tracking-content').innerHTML = `
+            <div class="alert alert-danger small mb-0">Gagal memuat status pelacakan.</div>`;
     }
 }
 

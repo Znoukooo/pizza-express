@@ -170,7 +170,7 @@
                 <div class="modal-body p-3">
                     <p class="small text-muted mb-1">Silakan scan QRIS & bayar sebesar:</p>
                     <h4 class="fw-bold text-danger mb-3" id="customer-qris-total">Rp 0</h4>
-                    <img src="css/qris-gopay.png" alt="QRIS Gopay" class="img-fluid rounded border p-2 mb-3 shadow-sm" style="max-height: 260px;">
+                    <img src="css/qris.jpeg" alt="QRIS Gopay" class="img-fluid rounded border p-2 mb-3 shadow-sm" style="max-height: 260px;">
                     <div class="alert alert-info py-2 small mb-0 font-monospace">
                         NO ANTRIAN ANDA: <strong id="customer-qris-queue">#00</strong>
                     </div>
@@ -194,8 +194,10 @@
                     <div class="spinner-border text-danger" role="status"></div>
                     <p class="mt-2 text-muted small">Memuat status pesanan...</p>
                 </div>
-                <div class="modal-footer p-2 bg-white border-top">
-                    <button type="button" class="btn btn-outline-danger w-100 fw-bold" onclick="cekStatusPesanan()">🔄 Refresh Status Terbaru</button>
+                <div class="modal-footer p-2 bg-white border-top" style="position: relative; z-index: 1060;">
+                    <button type="button" class="btn btn-outline-danger w-100 fw-bold" onclick="cekStatusPesanan()">
+                        🔄 Refresh Status Terbaru
+                    </button>
                 </div>
             </div>
         </div>
